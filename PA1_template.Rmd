@@ -45,7 +45,6 @@ medianStepsPerDay <- median(byDay$dailySteps)
 A histogram of the recorded steps per day is shown below, to illustrate the relative frequency of steps per day. Note that this excludes days that had missing recorded values.
 
 ```{r}
-#hist(byDay$dailySteps, xlab = "Number of steps per day", ylab="How many days", main = "Histogram of daily steps", breaks=20)
 qplot(dailySteps, data=byDay, geom="histogram",  xlab = "Number of steps per day", ylab="How many days", main = "Histogram of daily steps")
 ```
 
@@ -69,6 +68,35 @@ As can be seen the interval that has the highest average number of steps is `r m
 
 ## Inputing missing values
 
+```{r}
+numNas <- nrow(activity[is.na(activity$steps),])
+naPercent <- 100*numNas / nrow(activity) 
+```
 
+There are a number of missing values in the dataset - `r numNas`, which is equivalent to `r naPercent` % of the total dataset. One strategy to remove any missing values is to replace them with the average step count for the particular interval that is missing.
+
+```{r}
+getAvg <- function(steps, intervals) {
+        s <- vector(length=length(steps))
+        for(i in 1:length(steps)) {
+            if (is.na(steps[i])) {
+                s[i] <- byInterval[byInterval$interval == intervals[i],]$avgSteps
+            } else {
+                s[i] <= steps[i]
+            }
+        }
+        s
+}
+synthed <- mutate(activity, steps=getAvg(steps, interval))
+```
+
+A histogram of the daily steps for this new dataset is shown below
+
+```{r}
+synthByDay <- group_by(synthed,date) %>%
+    summarise(dailySteps = sum(steps)) %>%
+    filter(dailySteps != 0)
+qplot(dailySteps, data=synthByDay, geom="histogram",  xlab = "Number of steps per day", ylab="How many days", main = "Histogram of daily steps")
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
