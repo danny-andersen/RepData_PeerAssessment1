@@ -4,7 +4,10 @@ output:
   html_document:
     keep_md: true
 ---
-```{r echo=FALSE}
+
+Libraries used:
+
+```{r warning=FALSE, message=FALSE}
 library(dplyr)
 library(ggplot2)
 ```
@@ -12,7 +15,7 @@ library(ggplot2)
 ## Loading and preprocessing the data
 Analysis of data obtained from an activity monitor for an individual that measured the steps taken over a 5 minute period over a number of days. 
 
-The raw data was downloaded and read it into a data frame, ready for the analysis.
+The raw data was downloaded and read into a data frame, ready for the analysis. The only pre-processing required was to convert the date string field into a full POSIX date object.
 
 ```{r}
 url<-"https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
@@ -24,7 +27,7 @@ activity<-mutate(activity, date=as.POSIXct(date,format="%Y-%m-%d"))
 
 ## What is the mean total number of steps taken per day?
 
-To analyse the number of steps per day, the activity data is grouped by day to summarise the number of steps taken. Note that days where no steps have been recorded have been removed from the dataset.
+To analyse the number of steps per day, the activity data is grouped by day to summarise the number of steps taken. Note that those intervals where no steps have been recorded where ignored, i.e. assumed to be zero.
 
 ```{r}
 byDay <- group_by(activity,date) %>%
@@ -42,7 +45,7 @@ medianStepsPerDay <- median(byDay$dailySteps)
     * The average number of steps per day is: `r format(avgStepsPerDay, nsmall=1, scientific = F)`  
     * The median number of steps per day is: `r format(medianStepsPerDay, nsmall=1, scientific = F)`
   
-A histogram of the recorded steps per day is shown below, to illustrate the relative frequency of steps per day. Note that this excludes days that had missing recorded values.
+A histogram of the recorded steps per day is shown below, to illustrate the relative frequency of steps per day. Note that this excludes these days that have no steps recorded at all.
 
 ```{r}
 qplot(dailySteps, data=byDay, geom="histogram",  xlab = "Number of steps per day", ylab="How many days", main = "Histogram of daily steps", binwidth=1000)
@@ -57,7 +60,7 @@ byInterval <- group_by(activity,interval) %>%
     summarise(avgSteps = mean(steps, na.rm = T)) %>%
     mutate(hm = ISOdatetime(1970,1,1,interval%/%60,interval%%60,0)) %>%
     mutate(hmc = strftime(hm,format="%H:%M"))
-plot(byInterval$hm,byInterval$avgSteps,type="l", xlab="Time of day", ylab="Avg steps", main="Average activity by time of day")
+plot(byInterval$hm,byInterval$avgSteps,type="l", xlab="Time of day (hours)", ylab="Avg steps", main="Average activity by time of day")
 ```
 
 ```{r}
@@ -73,9 +76,9 @@ numNas <- nrow(activity[is.na(activity$steps),])
 naPercent <- 100*numNas / nrow(activity) 
 ```
 
-There are a number of missing values in the dataset - `r numNas`, which is equivalent to `r naPercent` % of the total dataset. One strategy to remove any missing values is to replace them with the average step count for the particular interval that is missing. 
+There are a number of missing values in the dataset (`r numNas`), which is equivalent to `r format(naPercent, nsmall=1, scientific = F)` % of the total dataset. One strategy is to replace  missing values with the average step count for the particular interval that is missing. 
 
-The daily step count can the be calculated on this new dataset.
+The daily step count can then be calculated on this new dataset.
 
 ```{r}
 getAvg <- function(steps, intervals) {
@@ -114,27 +117,32 @@ qplot(dailySteps, data=synthByDay, geom="histogram",  xlab = "Number of steps pe
 
 ## Are there differences in activity patterns between weekdays and weekends?
 
-To determine if there is any difference in activity patterns, determine if the activity was undertaken during the weekend or not:
+To examine the difference in activity patterns between a weekday and a weekend, the data needs to be split by the type of day:
 
 ```{r}
 synthed$dayType1 = ifelse(weekdays(synthed$date) == "Saturday", 1, 0)
 synthed$dayType2 = ifelse(weekdays(synthed$date) == "Sunday", 1, 0)
+#If the day is at the weekend then dayType is 1
 synthed <- mutate(synthed, dayType = dayType1 + dayType2)
+#Convert to a meaningful factor
 synthed <- mutate(synthed, dayType = factor(ifelse(dayType==1, "Weekend", "Weekday")))
 synthed$dayType1 <- NULL
 synthed$dayType2 <- NULL
 ```
 
-The following two plots compare the weekend and weekday step activity as the average steps taken for each 5 minute period averaged across all measured days
+The following two plots compare the weekend and weekday step activity as the average steps taken for each 5 minute interval averaged across all measured days
 
 ```{r}
-synthAvg <- filter(synthed, dayType == "Weekday") %>%
-    group_by(interval) %>%
-    summarise(avgWdSteps = mean(steps, na.rm = T)) %>%
-    mutate(hm = ISOdatetime(1970,1,1,interval%/%60,interval%%60,0)) %>%
-    mutate(hmc = strftime(hm,format="%H:%M"))
-weAvg <- filter(synthed, dayType == "Weekend") %>%
-    group_by(interval) %>%
-    summarise(avgWeSteps = mean(steps, na.rm = T))
-synthAvg$avgWeSteps <- weAvg$avgWeSteps
+#Group by interval and day type to find the average steps per interval for weekdays and the weekend
+synthAvg <- group_by(synthed, interval, dayType) %>% 
+    summarise(avgSteps = mean(steps)) %>%
+    mutate(hm = ISOdatetime(1970,1,1,interval%/%60,interval%%60,0))
+ggplot(synthAvg, aes(interval,avgSteps)) +
+    labs(x="Time of day (minutes)") +
+    labs(y="Av steps in 5 minute interval") +
+    labs(title="Comparing step activity between the weekday and weekend") + 
+    geom_line() + 
+    facet_grid(dayType ~ .)
 ```
+
+As can be seen, there tends to be more step activity during the weekend than during a weekday, although the activity is shifted to the left, i.e. takes place later in the day. 
