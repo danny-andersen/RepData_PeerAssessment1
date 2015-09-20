@@ -60,7 +60,7 @@ byInterval <- group_by(activity,interval) %>%
     summarise(avgSteps = mean(steps, na.rm = T)) %>%
     mutate(hm = ISOdatetime(1970,1,1,interval%/%60,interval%%60,0)) %>%
     mutate(hmc = strftime(hm,format="%H:%M"))
-plot(byInterval$hm,byInterval$avgSteps,type="l", xlab="Time of day (hours)", ylab="Avg steps", main="Average activity by time of day")
+plot(byInterval$interval,byInterval$avgSteps,type="l", xlab="Time of day (mins)", ylab="Avg steps per 5 min interval", main="Average activity by time of day")
 ```
 
 ```{r}
